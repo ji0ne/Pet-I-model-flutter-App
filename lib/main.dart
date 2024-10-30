@@ -1,3 +1,4 @@
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firstnote/ble_controller.dart';
 import 'package:firstnote/live_stream_page.dart';
 import 'package:firstnote/pet_eye_page.dart';
@@ -6,11 +7,20 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import 'dart:math';
+import 'notification_service.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-void main() {
+import 'package:permission_handler/permission_handler.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().initialize();
+
   runApp(const MyApp());
 }
 
@@ -51,29 +61,37 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
     super.initState();
     _startTimer();
     _monitorTemperature();
+    _permissionWithNotification();
+  }
+
+  void _permissionWithNotification() async {
+    await [Permission.notification].request();
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(Duration(milliseconds: 100), (timer) {  // 1초에서 2초로 변경
+    _timer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      // 1초에서 2초로 변경
       if (controller.magnitudes.isNotEmpty) {
         // 최근 N개의 데이터만 사용하여 평균 계산
         List<double> recentMagnitudes = controller.magnitudes.length > 3
             ? controller.magnitudes.sublist(controller.magnitudes.length - 3)
             : controller.magnitudes;
 
-        double averageMagnitude = recentMagnitudes.reduce((a, b) => a + b) / recentMagnitudes.length;
+        double averageMagnitude =
+            recentMagnitudes.reduce((a, b) => a + b) / recentMagnitudes.length;
 
         // 상태 변경 로직에 히스테리시스 추가
         if (averageMagnitude < 0.1) {
           _movement.value = '정지';
         } else if (averageMagnitude >= 0.1 && averageMagnitude < 0.5) {
           _movement.value = '걷기';
-        } else if(averageMagnitude >= 0.5) {
+        } else if (averageMagnitude >= 0.5) {
           _movement.value = '뛰기';
         }
 
         // 일정 시간 동안 데이터가 없으면 정지 상태로 전환
-        if (DateTime.now().difference(controller.lastUpdateTime) > Duration(milliseconds: 300)) {
+        if (DateTime.now().difference(controller.lastUpdateTime) >
+            Duration(milliseconds: 300)) {
           _movement.value = '정지';
         }
 
@@ -88,9 +106,8 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
   void _monitorTemperature() {
     ever(controller.temperatureData, (String temp) {
       double temperature = double.tryParse(temp) ?? 0;
-      if (temperature >= 37.4 && !_isAlertShowing) {
-        _isAlertShowing = true;
-        _showVitalIssueDialog();
+      if (temperature >= 37.4) {
+        NotificationService().showForegroundNotification();
       }
     });
   }
@@ -123,7 +140,7 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                   ),
                 ),
                 Image.asset(
-                  'assets/dog-alert.png',  // 알림창에 표시할 강아지 이미지
+                  'assets/dog-alert.png', // 알림창에 표시할 강아지 이미지
                   width: 150,
                   height: 150,
                 ),
@@ -192,14 +209,14 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
   Future<void> _sendPostRequest() async {
     try {
       final response = await http.post(
-        Uri.parse('http://devse.gonetis.com:12478/send-signal'),  // 제공받은 도메인 주소
+        Uri.parse('http://devse.gonetis.com:12478/send-signal'), // 제공받은 도메인 주소
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'signal': '1'}),
       );
 
       if (response.statusCode == 200) {
         print('Signal sent successfully');
-        print('Server response: ${response.body}');  // 서버 응답 확인
+        print('Server response: ${response.body}'); // 서버 응답 확인
       } else {
         print('Failed to send signal. Status code: ${response.statusCode}');
         print('Error response: ${response.body}');
@@ -226,7 +243,8 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Colors.deepOrange),
+                    icon: const Icon(Icons.arrow_back_ios,
+                        color: Colors.deepOrange),
                     onPressed: () {},
                   ),
                   const Text(
@@ -242,14 +260,14 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => LiveStreamPage()),
+                        MaterialPageRoute(
+                            builder: (context) => LiveStreamPage()),
                       );
                     },
                   ),
                 ],
               ),
             ),
-
             Container(
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -260,20 +278,18 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
               child: Column(
                 children: [
                   Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey[300],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/hiro-profile.png',
-                        fit: BoxFit.cover,
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[300],
                       ),
-                    )
-                  ),
-
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/hiro-profile.png',
+                          fit: BoxFit.cover,
+                        ),
+                      )),
                   const SizedBox(height: 8),
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -300,8 +316,8 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                       _movement.value == '뛰기'
                           ? 'assets/running-dog-silhouette_47203.png'
                           : _movement.value == '걷기'
-                          ? 'assets/dog-facing-right.png'
-                          : 'assets/sitting-dog-icon.png',  // 정지 상태일 때의 이미지
+                              ? 'assets/dog-facing-right.png'
+                              : 'assets/sitting-dog-icon.png', // 정지 상태일 때의 이미지
                       width: 24,
                       height: 24,
                     );
@@ -309,7 +325,6 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                 ],
               ),
             ),
-
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.all(16),
@@ -339,11 +354,14 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                       const Icon(Icons.thermostat, color: Colors.deepOrange),
                       const SizedBox(width: 8),
                       Obx(() {
-                        double temp = double.tryParse(controller.s_temperature) ?? 0;
-                        Color temperatureColor = temp >= 37.5 ? Colors.red : Colors.green;
+                        double temp =
+                            double.tryParse(controller.s_temperature) ?? 0;
+                        Color temperatureColor =
+                            temp >= 37.5 ? Colors.red : Colors.green;
                         return Text(
                           '${controller.s_temperature}°C',
-                          style: TextStyle(fontSize: 16, color: temperatureColor),
+                          style:
+                              TextStyle(fontSize: 16, color: temperatureColor),
                         );
                       }),
                     ],
@@ -351,7 +369,6 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                 ],
               ),
             ),
-
             Expanded(
               child: GetBuilder<BleController>(
                 builder: (controller) {
@@ -359,7 +376,8 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                     stream: controller.scanResults,
                     builder: (context, snapshot) {
                       if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                        List<ScanResult> filteredResults = snapshot.data!.where((result) {
+                        List<ScanResult> filteredResults =
+                            snapshot.data!.where((result) {
                           String deviceName = result.device.name.toUpperCase();
                           return deviceName.contains('PET');
                         }).toList();
@@ -379,14 +397,19 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: ListTile(
-                                title: Text(data.device.name.isEmpty ? 'Unknown Device' : data.device.name),
+                                title: Text(data.device.name.isEmpty
+                                    ? 'Unknown Device'
+                                    : data.device.name),
                                 subtitle: Obx(() {
-                                  if (controller.connectingDeviceId.value == data.device.id.id) {
+                                  if (controller.connectingDeviceId.value ==
+                                      data.device.id.id) {
                                     return Text(
                                       'Connecting...',
                                       style: TextStyle(color: Colors.orange),
                                     );
-                                  } else if (controller.connectedDevice?.id.id == data.device.id.id &&
+                                  } else if (controller
+                                              .connectedDevice?.id.id ==
+                                          data.device.id.id &&
                                       controller.isConnected.value) {
                                     return Text(
                                       'Connected',
@@ -396,7 +419,8 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                                   return Text(data.device.id.id);
                                 }),
                                 trailing: Text(data.rssi.toString()),
-                                onTap: () => controller.connectToDevice(data.device),
+                                onTap: () =>
+                                    controller.connectToDevice(data.device),
                               ),
                             );
                           },
@@ -409,7 +433,6 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                 },
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -449,7 +472,6 @@ class _PetProfileScreenState extends State<PetProfileScreen> {
                 ],
               ),
             ),
-
             Container(
               height: 60,
               decoration: const BoxDecoration(

@@ -16,7 +16,7 @@ class BleController extends GetxController {
 
   // 반응형 변수로 변경
   RxString completeData = "".obs;
-  RxString bpmData = "74".obs;  // 초기값 설정
+  RxString bpmData = "74".obs; // 초기값 설정
   RxString temperatureData = "36.5".obs;
 
   // 다른 클래스에서 사용할 수신한 전체 데이터 변수
@@ -70,7 +70,8 @@ class BleController extends GetxController {
 
       for (var service in services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid == Guid('00002a57-0000-1000-8000-00805f9b34fb')) {
+          if (characteristic.uuid ==
+              Guid('00002a57-0000-1000-8000-00805f9b34fb')) {
             if (characteristic.properties.notify) {
               print("Notify Characteristic Found: $characteristic");
               _subscribeToCharacteristic(characteristic);
@@ -84,7 +85,7 @@ class BleController extends GetxController {
       }
     } catch (e) {
       print("Connection error: $e");
-    }finally{
+    } finally {
       connectingDeviceId.value = null;
     }
   }
@@ -95,27 +96,28 @@ class BleController extends GetxController {
       String data = utf8.decode(value);
       print("Raw received data: $data");
 
-      if (data.contains('V')) {  // 백슬래시를 포함한 데이터는 체온/심박수
+      if (data.contains('V')) {
+        // 백슬래시를 포함한 데이터는 체온/심박수
         List<String> parts = data.split('|');
         print("Vital signs parts: $parts");
         try {
-         String temperStr = temperatureData.value = parts[0].trim();
-         double temperatureValue = double.parse(temperStr);
-         double adjustTemperature = temperatureValue + 3.40;
-         temperatureData.value = adjustTemperature.toStringAsFixed(1);
-         print("Temperature updated: ${temperatureData.value}");
+          String temperStr = temperatureData.value = parts[0].trim();
+          double temperatureValue = double.parse(temperStr);
+          double adjustTemperature = temperatureValue + 3.40;
+          temperatureData.value = adjustTemperature.toStringAsFixed(1);
+          print("Temperature updated: ${temperatureData.value}");
 
-         // 심박수 처리 ('V' 제거하고 처리)
-         String bpmStr = parts[1].replaceAll('V', '').trim();
-         double bpmValue = double.parse(bpmStr);
-         double adjustedBpm = bpmValue + 60.0;
-         bpmData.value = adjustedBpm.toStringAsFixed(1);
-         print("BPM updated: ${bpmData.value}");
-
+          // 심박수 처리 ('V' 제거하고 처리)
+          String bpmStr = parts[1].replaceAll('V', '').trim();
+          double bpmValue = double.parse(bpmStr);
+          double adjustedBpm = bpmValue + 60.0;
+          bpmData.value = adjustedBpm.toStringAsFixed(1);
+          print("BPM updated: ${bpmData.value}");
         } catch (e) {
           print("Error processing temp/BPM data: $e");
         }
-      } else if (data.contains('!')) {  // 자이로/가속도 데이터
+      } else if (data.contains('!')) {
+        // 자이로/가속도 데이터
         completeData.value += data;
         _processMotionData(completeData.value);
         completeData.value = "";
@@ -139,13 +141,13 @@ class BleController extends GetxController {
         double gy = double.tryParse(dataParts[6].trim()) ?? 0;
         double gz = double.tryParse(dataParts[7].trim()) ?? 0;
 
-        double magnitude = sqrt(ax * ax + ay * ay + az * az + gx * gx + gy * gy + gz * gz);
+        double magnitude =
+            sqrt(ax * ax + ay * ay + az * az + gx * gx + gy * gy + gz * gz);
 
-        if(magnitude > 0.1)
-          {
-            magnitudes.add(magnitude);
-            lastUpdateTime = DateTime.now();
-          }
+        if (magnitude > 0.1) {
+          magnitudes.add(magnitude);
+          lastUpdateTime = DateTime.now();
+        }
 
         print("Calculated magnitude: $magnitude");
 
